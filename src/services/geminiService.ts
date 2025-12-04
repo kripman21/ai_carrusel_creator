@@ -146,7 +146,13 @@ You will receive two sets of instructions.
 1.  **Image Style Prompt**: This dictates the overall visual aesthetic, including colors, mood, and subject style. (This is optional if using a stock image source)
 2.  **Slide Content Prompt**: This provides the text, topics, and information for the slides.
 
-Your task is to break down the content prompt into a series of slides, writing a catchy 'title' and concise 'body' for each. For each slide, you must also generate a detailed 'prompt' for an image generation model that strictly adheres to the visual style described in the Image Style Prompt (if provided) and is suitable for the ${newAspectRatioText} aspect ratio. These image prompts should be rich in visual detail to ensure the model can successfully generate a relevant and high-quality image. Crucially, if a slide's content is abstract (like a quote), you must translate that abstract concept into a concrete, visually descriptive scene. For example, for a quote about 'boldness', you could describe 'a woman in a vibrant red dress standing confidently at the edge of a skyscraper overlooking a city at dusk'. Do not create abstract or metaphorical prompts; always describe a physical scene. You must return a JSON array of these slide objects.`;
+Your task is to break down the content prompt into a series of slides, writing a catchy 'title' and concise 'body' for each.
+
+**TEXT HIGHLIGHTING RULES (CRITICAL):**
+1.  **Body**: Identify the most important phrases or key ideas within the text and enclose them in single asterisks (*highlighted text*) to emphasize them.
+2.  **Title**: If the title has **more than 3 words**, enclose the last 1-3 words in single asterisks for emphasis (e.g., "The Power of *Red*"). If the title has 3 words or less, do NOT use asterisks.
+
+For each slide, you must also generate a detailed 'prompt' for an image generation model that strictly adheres to the visual style described in the Image Style Prompt (if provided) and is suitable for the ${newAspectRatioText} aspect ratio. These image prompts should be rich in visual detail to ensure the model can successfully generate a relevant and high-quality image. Crucially, if a slide's content is abstract (like a quote), you must translate that abstract concept into a concrete, visually descriptive scene. For example, for a quote about 'boldness', you could describe 'a woman in a vibrant red dress standing confidently at the edge of a skyscraper overlooking a city at dusk'. Do not create abstract or metaphorical prompts; always describe a physical scene. You must return a JSON array of these slide objects.`;
 
         const combinedUserPrompt = imagePrompt ? `IMAGE STYLE PROMPT:\n${imagePrompt}\n\nSLIDE CONTENT PROMPT:\n${contentPrompt}` : `SLIDE CONTENT PROMPT:\n${contentPrompt}`;
 

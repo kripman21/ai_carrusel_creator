@@ -1,4 +1,4 @@
-import { useState, useCallback, useLayoutEffect, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { generateCarousel, generateImage } from './services/geminiService';
 import type { Slide, StyleState, LayoutState, ShadowState, CtaState, StylePreset } from './types';
 import { Icon } from './components/Icon';
@@ -40,18 +40,25 @@ const testSlidesData = [
 
 // --- Main App Component ---
 export default function App() {
-    const [slides, setSlides] = useState<Slide[]>([]);
+    // --- State Initialization with Persistence ---
+    const savedSession = (() => {
+        try {
+            return JSON.parse(localStorage.getItem('acc_session_v1') || 'null');
+        } catch { return null; }
+    })();
+
+    const [slides, setSlides] = useState<Slide[]>(savedSession?.slides || []);
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [imagePrompt, setImagePrompt] = useState(defaultImagePrompt);
-    const [contentPrompt, setContentPrompt] = useState(defaultContentPrompt);
-    const [carouselName, setCarouselName] = useState('My-AI-Carousel');
-    const [aspectRatio, setAspectRatio] = useState<'1:1' | '4:5'>('1:1');
-    const [imageSource, setImageSource] = useState<'ai' | 'pexels'>('ai');
+    const [imagePrompt, setImagePrompt] = useState(savedSession?.imagePrompt || defaultImagePrompt);
+    const [contentPrompt, setContentPrompt] = useState(savedSession?.contentPrompt || defaultContentPrompt);
+    const [carouselName, setCarouselName] = useState(savedSession?.carouselName || 'My-AI-Carousel');
+    const [aspectRatio, setAspectRatio] = useState<'1:1' | '4:5'>(savedSession?.aspectRatio || '1:1');
+    const [imageSource, setImageSource] = useState<'ai' | 'pexels'>(savedSession?.imageSource || 'ai');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [logo, setLogo] = useState<string | null>(null);
-    const [logoSize, setLogoSize] = useState(12);
-    const [imageOverlayStyle, setImageOverlayStyle] = useState(DEFAULT_IMAGE_OVERLAY_STYLE);
+    const [logo, setLogo] = useState<string | null>(savedSession?.logo || null);
+    const [logoSize, setLogoSize] = useState(savedSession?.logoSize || 12);
+    const [imageOverlayStyle, setImageOverlayStyle] = useState(savedSession?.imageOverlayStyle || DEFAULT_IMAGE_OVERLAY_STYLE);
     const previewContainerRef = useRef<HTMLDivElement>(null);
     const [presets, setPresets] = useState<StylePreset[]>([]);
     const [activePresetId, setActivePresetId] = useState<string | null>(null);
@@ -90,6 +97,24 @@ export default function App() {
             }
         }
     }, [presets]);
+
+    // --- Auto-Save Session ---
+    useEffect(() => {
+        if (slides.length > 0 || imagePrompt !== defaultImagePrompt || contentPrompt !== defaultContentPrompt) {
+            const sessionData = {
+                slides,
+                imagePrompt,
+                contentPrompt,
+                carouselName,
+                aspectRatio,
+                imageSource,
+                logo,
+                logoSize,
+                imageOverlayStyle
+            };
+            localStorage.setItem('acc_session_v1', JSON.stringify(sessionData));
+        }
+    }, [slides, imagePrompt, contentPrompt, carouselName, aspectRatio, imageSource, logo, logoSize, imageOverlayStyle]);
 
     useEffect(() => {
         if (slides.length > 0 && currentIndex >= slides.length) {
@@ -131,7 +156,7 @@ export default function App() {
         setActivePresetId(null);
     };
     const handleImageOverlayUpdate = (prop: string, value: any) => {
-        setImageOverlayStyle(s => ({ ...s, [prop]: value }));
+        setImageOverlayStyle((s: typeof DEFAULT_IMAGE_OVERLAY_STYLE) => ({ ...s, [prop]: value }));
         setActivePresetId(null);
     };
 
@@ -438,11 +463,18 @@ export default function App() {
     }, []);
 
     const handleStartOver = useCallback(() => {
-        setSlides([]);
-        setError(null);
-        setCurrentIndex(0);
-        resetToDefaultStyles();
-        setLogo(null);
+        if (window.confirm("Are you sure? This will clear your current workspace.")) {
+            setSlides([]);
+            setError(null);
+            setCurrentIndex(0);
+            resetToDefaultStyles();
+            setLogo(null);
+            // Clear Prompt Inputs too for a fresh start
+            setImagePrompt(defaultImagePrompt);
+            setContentPrompt(defaultContentPrompt);
+            setCarouselName('My-AI-Carousel');
+            localStorage.removeItem('acc_session_v1'); // Clear storage
+        }
     }, [resetToDefaultStyles]);
 
     // --- Canvas Drawing Logic ---
