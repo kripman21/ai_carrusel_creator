@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { generateCarousel, generateImage } from './services/geminiService';
+import { generatePDF } from './services/pdfService';
 import type { Slide, StyleState, LayoutState, ShadowState, CtaState, StylePreset } from './types';
 import { Icon } from './components/Icon';
 import { Carousel } from './components/Carousel';
@@ -716,6 +717,12 @@ export default function App() {
 
     }, [slides, carouselName, generateSlideCanvas, showToast]);
 
+    const handleDownloadPDF = useCallback(() => {
+        if (slides.length === 0) return;
+        showToast("Generating PDF...");
+        generatePDF(slides, logo, logoSize, imageOverlayStyle, aspectRatio, carouselName);
+    }, [slides, logo, logoSize, imageOverlayStyle, aspectRatio, carouselName]);
+
     return (
         <div className="w-full h-screen bg-gray-900 text-white flex items-center justify-center">
             {toast.visible && (
@@ -864,6 +871,7 @@ export default function App() {
                                     aspectRatio={aspectRatio}
                                     carouselName={carouselName}
                                     onCarouselNameChange={setCarouselName}
+                                    onDownloadPdf={handleDownloadPDF}
                                 />
                             )}
                         </div>

@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableItem } from './SortableItem';
 import { Icon } from './Icon';
 import { StyleEditor } from './StyleEditor';
 import { JsonViewerModal } from './JsonViewerModal';
@@ -28,10 +32,32 @@ interface TextEditorPanelProps {
     aspectRatio: '1:1' | '4:5';
     carouselName: string;
     onCarouselNameChange: (name: string) => void;
+    onDownloadPdf: () => void;
 }
 
 export const TextEditorPanel: React.FC<TextEditorPanelProps> = (props) => {
-    const { slides, currentIndex, onSlidesChange, onStartOver, onDownload, onDownloadAll, onRegenerateImage, onOpenPexelsSearch, logo, onLogoChange, logoSize, onLogoSizeChange, imageOverlay, onImageOverlayChange, presets, activePresetId, onSavePreset, onApplyPreset, onDeletePreset, onExportPreset, onImportPreset, imageSource, carouselName, onCarouselNameChange } = props;
+    const { slides, currentIndex, onSlidesChange, onStartOver, onDownload, onDownloadAll, onDownloadPdf, onRegenerateImage, onOpenPexelsSearch, logo, onLogoChange, logoSize, onLogoSizeChange, imageOverlay, onImageOverlayChange, presets, activePresetId, onSavePreset, onApplyPreset, onDeletePreset, onExportPreset, onImportPreset, imageSource, carouselName, onCarouselNameChange } = props;
+
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+
+        if (over && active.id !== over.id) {
+            const oldIndex = slides.findIndex((slide) => slide.id === active.id);
+            const newIndex = slides.findIndex((slide) => slide.id === over.id);
+
+            if (oldIndex !== -1 && newIndex !== -1) {
+                onSlidesChange(arrayMove(slides, oldIndex, newIndex));
+            }
+        }
+    };
+
     const [expandedSlideId, setExpandedSlideId] = useState<string | null>(null);
     const [selection, setSelection] = useState<{ slideId: string, field: 'title' | 'body', start: number, end: number } | null>(null);
     const [isPresetsOpen, setIsPresetsOpen] = useState(false);
@@ -240,6 +266,11 @@ export const TextEditorPanel: React.FC<TextEditorPanelProps> = (props) => {
                                             <Icon name="downloadMultiple" /> Download All (.zip)
                                         </button>
                                     </li>
+                                    <li>
+                                        <button onClick={() => { onDownloadPdf(); setIsDownloadMenuOpen(false); }} className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-md flex items-center gap-2 transition-colors">
+                                            <Icon name="download" /> Download PDF
+                                        </button>
+                                    </li>
                                 </ul>
                             </div>
                         )}
@@ -281,96 +312,109 @@ export const TextEditorPanel: React.FC<TextEditorPanelProps> = (props) => {
 
             {activeTab === 'slides' && (
                 <div className="flex-grow overflow-y-auto space-y-4 pt-4 px-4">
-                    {slides.map((slide, index) => (
-                        <div key={slide.id} className="bg-gray-950/50 p-4 rounded-xl border border-gray-800">
-                            <div className="flex justify-between items-center mb-3">
-                                <h3 className="font-semibold text-gray-400">Slide {index + 1}</h3>
-                                <div className="flex items-center gap-2">
-                                    {imageSource === 'ai' ? (
-                                        <button onClick={() => onRegenerateImage(slide.id)} className="text-gray-400 hover:text-white transition-colors" aria-label={`Regenerate image for slide ${index + 1}`}><Icon name="refresh" className="text-xl" /></button>
-                                    ) : (
-                                        <button onClick={() => onOpenPexelsSearch(slide)} className="px-3 py-1 bg-gray-700 text-white rounded-lg text-sm font-semibold hover:bg-gray-600 flex items-center gap-2 transition-colors" aria-label={`Search Pexels image for slide ${index + 1}`}><Icon name="search" className="text-base" />Search</button>
-                                    )}
-                                    <button onClick={() => setExpandedSlideId(prev => prev === slide.id ? null : slide.id)} className="text-gray-400 hover:text-white transition-colors" aria-label={`Customize slide ${index + 1}`}><Icon name="settings" className="text-xl" /></button>
-                                </div>
-                            </div>
-                            {slide.error && (
-                                <div className="bg-red-900/30 border border-red-700/50 text-red-300 text-xs rounded-lg p-2 flex items-start gap-2 mb-3">
-                                    <Icon name="alert" className="text-base flex-shrink-0 mt-0.5" />
-                                    <span>{slide.error}</span>
-                                </div>
-                            )}
-                            <div className="space-y-3">
-                                <div>
-                                    <div className="flex items-center justify-between mb-1">
-                                        <label htmlFor={`title-${slide.id}`} className="text-sm font-medium text-gray-400">Title</label>
-                                        <button onClick={() => handleApplyHighlight(slide.id, 'title')} className="text-gray-400 hover:text-white transition-colors p-1" title="Highlight selected text"><Icon name="highlight" className="text-base" /></button>
-                                    </div>
-                                    <input id={`title-${slide.id}`} type="text" value={slide.title} onSelect={(e) => setSelection({ slideId: slide.id, field: 'title', start: e.currentTarget.selectionStart ?? 0, end: e.currentTarget.selectionEnd ?? 0 })} onChange={(e) => handleSlideUpdate(index, 'title', e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-                                </div>
-                                <div>
-                                    <div className="flex items-center justify-between mb-1">
-                                        <label htmlFor={`body-${slide.id}`} className="text-sm font-medium text-gray-400">Body Text</label>
-                                        <button onClick={() => handleApplyHighlight(slide.id, 'body')} className="text-gray-400 hover:text-white transition-colors p-1" title="Highlight selected text"><Icon name="highlight" className="text-base" /></button>
-                                    </div>
-                                    <textarea id={`body-${slide.id}`} value={slide.body} onSelect={(e) => setSelection({ slideId: slide.id, field: 'body', start: e.currentTarget.selectionStart ?? 0, end: e.currentTarget.selectionEnd ?? 0 })} onChange={(e) => handleSlideUpdate(index, 'body', e.target.value)} rows={3} className="w-full bg-gray-800 border border-gray-700 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none resize-y" />
-                                </div>
-                                <div className="flex items-center justify-between pt-2 border-t border-gray-800/50">
-                                    <label htmlFor={`cta-enabled-${slide.id}`} className="text-sm font-medium text-gray-400">Call to Action</label>
-                                    <input type="checkbox" id={`cta-enabled-${slide.id}`} checked={slide.cta.enabled} onChange={(e) => handleStyleChange(index, 'cta', 'enabled', e.target.checked)} className="form-checkbox h-4 w-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500" />
-                                </div>
-                                {slide.cta.enabled && (
-                                    <div><label htmlFor={`cta-text-${slide.id}`} className="text-sm font-medium text-gray-400 block mb-1">CTA Text</label><input id={`cta-text-${slide.id}`} type="text" value={slide.cta.text} onChange={(e) => handleStyleChange(index, 'cta', 'text', e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" /></div>
-                                )}
-                            </div>
-                            {expandedSlideId === slide.id && (
-                                <div className="mt-3">
-                                    <StyleEditor
-                                        titleStyle={slide.titleStyle} onTitleStyleChange={(p, v) => handleStyleChange(index, 'titleStyle', p, v)}
-                                        bodyStyle={slide.bodyStyle} onBodyStyleChange={(p, v) => handleStyleChange(index, 'bodyStyle', p, v)}
-                                        layoutStyle={slide.layoutStyle} onLayoutStyleChange={(p, v) => handleStyleChange(index, 'layoutStyle', p, v)}
-                                        onApplyStylesToAll={() => handleApplyStylesToAll(index)}
-                                    />
-                                    {slide.cta.enabled && (
-                                        <details className="mt-2 p-3 bg-gray-800/50 rounded-xl border border-gray-700 group" open>
-                                            <summary className="font-semibold text-gray-300 list-none cursor-pointer group-open:mb-3">Call to Action Styles</summary>
-                                            <div className="space-y-3 p-3 bg-gray-900/50 rounded-lg">
-                                                <h4 className="font-semibold text-gray-400 text-sm">Text</h4>
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <div className="flex items-center bg-gray-800 border border-gray-700 rounded-md">
-                                                        <input type="color" value={slide.cta.style.color} onChange={(e) => handleStyleChange(index, 'cta', 'color', e.target.value)} className="w-10 h-9 p-1 bg-transparent border-none cursor-pointer appearance-none" aria-label="CTA color picker" />
-                                                        <input type="text" value={slide.cta.style.color} onChange={(e) => handleStyleChange(index, 'cta', 'color', e.target.value)} className="w-full bg-transparent text-sm focus:outline-none pr-2" aria-label="CTA color hex code" maxLength={7} />
-                                                    </div>
-                                                    <div className="flex items-center bg-gray-800 border border-gray-700 rounded-md px-2"><input type="number" value={slide.cta.style.fontSize} onChange={(e) => handleStyleChange(index, 'cta', 'fontSize', parseInt(e.target.value, 10))} className="w-full bg-transparent text-sm focus:outline-none" aria-label="CTA font size" /><span className="text-xs text-gray-500">px</span></div>
-                                                </div>
-                                                <div className="flex bg-gray-800 border border-gray-700 rounded-md">
-                                                    {(['left', 'center', 'right'] as TextAlign[]).map(align => (
-                                                        <button key={align} onClick={() => handleStyleChange(index, 'cta', 'textAlign', align)} className={`flex-1 p-1.5 rounded-md transition-colors ${slide.cta.style.textAlign === align ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`} aria-label={`CTA align ${align}`}><Icon name={`align${align.charAt(0).toUpperCase() + align.slice(1)}` as any} className="text-xl" /></button>
-                                                    ))}
-                                                </div>
-                                                <select value={slide.cta.style.fontFamily} onChange={(e) => handleStyleChange(index, 'cta', 'fontFamily', e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" aria-label="CTA font family">
-                                                    {googleFonts.map(font => <option key={font} value={font}>{font.split(',')[0]}</option>)}
-                                                </select>
-                                                <h4 className="font-semibold text-gray-400 text-sm pt-3 border-t border-gray-800">Background</h4>
-                                                <div className="grid grid-cols-2 gap-4 items-center">
-                                                    <div>
-                                                        <label className="text-xs text-gray-400">Color</label>
-                                                        <div className="flex items-center bg-gray-800 border border-gray-700 rounded-md mt-1">
-                                                            <input type="color" value={slide.cta.background.color} onChange={(e) => handleStyleChange(index, 'cta', 'backgroundColor', e.target.value)} className="w-10 h-9 p-1 bg-transparent border-none cursor-pointer appearance-none" aria-label="CTA background color picker" />
-                                                            <input type="text" value={slide.cta.background.color} onChange={(e) => handleStyleChange(index, 'cta', 'backgroundColor', e.target.value)} className="w-full bg-transparent text-sm focus:outline-none pr-2" aria-label="CTA background color hex code" maxLength={7} />
-                                                        </div>
-                                                    </div>
-                                                    <div><label className="text-xs text-gray-400">Border Radius: {slide.cta.background.borderRadius}px</label><input type="range" min="0" max="50" value={slide.cta.background.borderRadius} onChange={(e) => handleStyleChange(index, 'cta', 'borderRadius', parseInt(e.target.value, 10))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mt-1" /></div>
-                                                    <div><label className="text-xs text-gray-400">Padding X: {slide.cta.background.paddingX}px</label><input type="range" min="0" max="50" value={slide.cta.background.paddingX} onChange={(e) => handleStyleChange(index, 'cta', 'paddingX', parseInt(e.target.value, 10))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mt-1" /></div>
-                                                    <div><label className="text-xs text-gray-400">Padding Y: {slide.cta.background.paddingY}px</label><input type="range" min="0" max="50" value={slide.cta.background.paddingY} onChange={(e) => handleStyleChange(index, 'cta', 'paddingY', parseInt(e.target.value, 10))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mt-1" /></div>
-                                                </div>
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <SortableContext
+                            items={slides.map(s => s.id)}
+                            strategy={verticalListSortingStrategy}
+                        >
+                            {slides.map((slide, index) => (
+                                <SortableItem key={slide.id} id={slide.id}>
+                                    <div className="bg-gray-950/50 p-4 rounded-xl border border-gray-800 mb-4">
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h3 className="font-semibold text-gray-400 cursor-grab active:cursor-grabbing">Slide {index + 1} <Icon name="list" className="ml-2 text-gray-600 text-xs inline" /></h3>
+                                            <div className="flex items-center gap-2">
+                                                {imageSource === 'ai' ? (
+                                                    <button onClick={() => onRegenerateImage(slide.id)} className="text-gray-400 hover:text-white transition-colors" aria-label={`Regenerate image for slide ${index + 1}`}><Icon name="refresh" className="text-xl" /></button>
+                                                ) : (
+                                                    <button onClick={() => onOpenPexelsSearch(slide)} className="px-3 py-1 bg-gray-700 text-white rounded-lg text-sm font-semibold hover:bg-gray-600 flex items-center gap-2 transition-colors" aria-label={`Search Pexels image for slide ${index + 1}`}><Icon name="search" className="text-base" />Search</button>
+                                                )}
+                                                <button onClick={() => setExpandedSlideId(prev => prev === slide.id ? null : slide.id)} className="text-gray-400 hover:text-white transition-colors" aria-label={`Customize slide ${index + 1}`}><Icon name="settings" className="text-xl" /></button>
                                             </div>
-                                        </details>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    ))}
+                                        </div>
+                                        {slide.error && (
+                                            <div className="bg-red-900/30 border border-red-700/50 text-red-300 text-xs rounded-lg p-2 flex items-start gap-2 mb-3">
+                                                <Icon name="alert" className="text-base flex-shrink-0 mt-0.5" />
+                                                <span>{slide.error}</span>
+                                            </div>
+                                        )}
+                                        <div className="space-y-3">
+                                            <div>
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <label htmlFor={`title-${slide.id}`} className="text-sm font-medium text-gray-400">Title</label>
+                                                    <button onClick={() => handleApplyHighlight(slide.id, 'title')} className="text-gray-400 hover:text-white transition-colors p-1" title="Highlight selected text"><Icon name="highlight" className="text-base" /></button>
+                                                </div>
+                                                <input id={`title-${slide.id}`} type="text" value={slide.title} onSelect={(e) => setSelection({ slideId: slide.id, field: 'title', start: e.currentTarget.selectionStart ?? 0, end: e.currentTarget.selectionEnd ?? 0 })} onChange={(e) => handleSlideUpdate(index, 'title', e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <label htmlFor={`body-${slide.id}`} className="text-sm font-medium text-gray-400">Body Text</label>
+                                                    <button onClick={() => handleApplyHighlight(slide.id, 'body')} className="text-gray-400 hover:text-white transition-colors p-1" title="Highlight selected text"><Icon name="highlight" className="text-base" /></button>
+                                                </div>
+                                                <textarea id={`body-${slide.id}`} value={slide.body} onSelect={(e) => setSelection({ slideId: slide.id, field: 'body', start: e.currentTarget.selectionStart ?? 0, end: e.currentTarget.selectionEnd ?? 0 })} onChange={(e) => handleSlideUpdate(index, 'body', e.target.value)} rows={3} className="w-full bg-gray-800 border border-gray-700 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none resize-y" />
+                                            </div>
+                                            <div className="flex items-center justify-between pt-2 border-t border-gray-800/50">
+                                                <label htmlFor={`cta-enabled-${slide.id}`} className="text-sm font-medium text-gray-400">Call to Action</label>
+                                                <input type="checkbox" id={`cta-enabled-${slide.id}`} checked={slide.cta.enabled} onChange={(e) => handleStyleChange(index, 'cta', 'enabled', e.target.checked)} className="form-checkbox h-4 w-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500" />
+                                            </div>
+                                            {slide.cta.enabled && (
+                                                <div><label htmlFor={`cta-text-${slide.id}`} className="text-sm font-medium text-gray-400 block mb-1">CTA Text</label><input id={`cta-text-${slide.id}`} type="text" value={slide.cta.text} onChange={(e) => handleStyleChange(index, 'cta', 'text', e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" /></div>
+                                            )}
+                                        </div>
+                                        {expandedSlideId === slide.id && (
+                                            <div className="mt-3">
+                                                <StyleEditor
+                                                    titleStyle={slide.titleStyle} onTitleStyleChange={(p, v) => handleStyleChange(index, 'titleStyle', p, v)}
+                                                    bodyStyle={slide.bodyStyle} onBodyStyleChange={(p, v) => handleStyleChange(index, 'bodyStyle', p, v)}
+                                                    layoutStyle={slide.layoutStyle} onLayoutStyleChange={(p, v) => handleStyleChange(index, 'layoutStyle', p, v)}
+                                                    onApplyStylesToAll={() => handleApplyStylesToAll(index)}
+                                                />
+                                                {slide.cta.enabled && (
+                                                    <details className="mt-2 p-3 bg-gray-800/50 rounded-xl border border-gray-700 group" open>
+                                                        <summary className="font-semibold text-gray-300 list-none cursor-pointer group-open:mb-3">Call to Action Styles</summary>
+                                                        <div className="space-y-3 p-3 bg-gray-900/50 rounded-lg">
+                                                            <h4 className="font-semibold text-gray-400 text-sm">Text</h4>
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                <div className="flex items-center bg-gray-800 border border-gray-700 rounded-md">
+                                                                    <input type="color" value={slide.cta.style.color} onChange={(e) => handleStyleChange(index, 'cta', 'color', e.target.value)} className="w-10 h-9 p-1 bg-transparent border-none cursor-pointer appearance-none" aria-label="CTA color picker" />
+                                                                    <input type="text" value={slide.cta.style.color} onChange={(e) => handleStyleChange(index, 'cta', 'color', e.target.value)} className="w-full bg-transparent text-sm focus:outline-none pr-2" aria-label="CTA color hex code" maxLength={7} />
+                                                                </div>
+                                                                <div className="flex items-center bg-gray-800 border border-gray-700 rounded-md px-2"><input type="number" value={slide.cta.style.fontSize} onChange={(e) => handleStyleChange(index, 'cta', 'fontSize', parseInt(e.target.value, 10))} className="w-full bg-transparent text-sm focus:outline-none" aria-label="CTA font size" /><span className="text-xs text-gray-500">px</span></div>
+                                                            </div>
+                                                            <div className="flex bg-gray-800 border border-gray-700 rounded-md">
+                                                                {(['left', 'center', 'right'] as TextAlign[]).map(align => (
+                                                                    <button key={align} onClick={() => handleStyleChange(index, 'cta', 'textAlign', align)} className={`flex-1 p-1.5 rounded-md transition-colors ${slide.cta.style.textAlign === align ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`} aria-label={`CTA align ${align}`}><Icon name={`align${align.charAt(0).toUpperCase() + align.slice(1)}` as any} className="text-xl" /></button>
+                                                                ))}
+                                                            </div>
+                                                            <select value={slide.cta.style.fontFamily} onChange={(e) => handleStyleChange(index, 'cta', 'fontFamily', e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" aria-label="CTA font family">
+                                                                {googleFonts.map(font => <option key={font} value={font}>{font.split(',')[0]}</option>)}
+                                                            </select>
+                                                            <h4 className="font-semibold text-gray-400 text-sm pt-3 border-t border-gray-800">Background</h4>
+                                                            <div className="grid grid-cols-2 gap-4 items-center">
+                                                                <div>
+                                                                    <label className="text-xs text-gray-400">Color</label>
+                                                                    <div className="flex items-center bg-gray-800 border border-gray-700 rounded-md mt-1">
+                                                                        <input type="color" value={slide.cta.background.color} onChange={(e) => handleStyleChange(index, 'cta', 'backgroundColor', e.target.value)} className="w-10 h-9 p-1 bg-transparent border-none cursor-pointer appearance-none" aria-label="CTA background color picker" />
+                                                                        <input type="text" value={slide.cta.background.color} onChange={(e) => handleStyleChange(index, 'cta', 'backgroundColor', e.target.value)} className="w-full bg-transparent text-sm focus:outline-none pr-2" aria-label="CTA background color hex code" maxLength={7} />
+                                                                    </div>
+                                                                </div>
+                                                                <div><label className="text-xs text-gray-400">Border Radius: {slide.cta.background.borderRadius}px</label><input type="range" min="0" max="50" value={slide.cta.background.borderRadius} onChange={(e) => handleStyleChange(index, 'cta', 'borderRadius', parseInt(e.target.value, 10))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mt-1" /></div>
+                                                                <div><label className="text-xs text-gray-400">Padding X: {slide.cta.background.paddingX}px</label><input type="range" min="0" max="50" value={slide.cta.background.paddingX} onChange={(e) => handleStyleChange(index, 'cta', 'paddingX', parseInt(e.target.value, 10))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mt-1" /></div>
+                                                                <div><label className="text-xs text-gray-400">Padding Y: {slide.cta.background.paddingY}px</label><input type="range" min="0" max="50" value={slide.cta.background.paddingY} onChange={(e) => handleStyleChange(index, 'cta', 'paddingY', parseInt(e.target.value, 10))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mt-1" /></div>
+                                                            </div>
+                                                        </div>
+                                                    </details>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </SortableItem>
+                            ))}
+                        </SortableContext>
+                    </DndContext>
                 </div>
             )}
 
