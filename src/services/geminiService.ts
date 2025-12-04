@@ -1,6 +1,17 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
+
+const base64ToBlobURL = (base64: string, contentType: string = 'image/png'): string => {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: contentType });
+    return URL.createObjectURL(blob);
+};
 
 // Helper to fetch image from URL and convert to base64
 export const imageUrlToBase64 = async (url: string): Promise<string> => {
@@ -96,7 +107,7 @@ export const generateImage = async (prompt: string, aspectRatio: '1:1' | '4:5'):
             throw new Error("No image data was found in the AI's response. Please try adjusting your 'Image Style Prompt'.");
         }
 
-        return image.image.imageBytes;
+        return base64ToBlobURL(image.image.imageBytes, 'image/png');
 
     } catch (geminiError) {
         console.error("Error generating image with imagen:", geminiError);
@@ -189,15 +200,15 @@ Your task is to break down the content prompt into a series of slides, writing a
                 // For Pexels, we fetch only one image initially using the AI-generated prompt
                 : fetchPexelsImages(slide.prompt.split(/[,.]/)[0].trim(), aspectRatio, pexelsKey, 1)
                     .then(urls => {
-                        if (urls.length > 0) return imageUrlToBase64(urls[0]);
+                        if (urls.length > 0) return urls[0];
                         throw new Error(`No Pexels image found for "${slide.prompt}"`);
                     });
 
-            return imagePromise.then(imageData => ({
+            return imagePromise.then(imageSrc => ({
                 prompt: slide.prompt,
                 title: slide.title,
                 body: slide.body,
-                src: `data:image/png;base64,${imageData}`
+                src: imageSrc
             }));
         });
 

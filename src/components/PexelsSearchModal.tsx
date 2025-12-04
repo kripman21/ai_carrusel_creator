@@ -1,13 +1,13 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Icon } from './Icon';
-import { fetchPexelsImages, imageUrlToBase64 } from '../services/geminiService';
+import { fetchPexelsImages } from '../services/geminiService';
 import type { Slide } from '../types';
 
 export interface PexelsSearchModalProps {
     slide: Slide;
     aspectRatio: '1:1' | '4:5';
     pexelsApiKey: string;
-    onImageSelect: (slideId: string, base64Image: string) => void;
+    onImageSelect: (slideId: string, imageUrl: string) => void;
     onClose: () => void;
 }
 
@@ -44,20 +44,13 @@ export const PexelsSearchModal: React.FC<PexelsSearchModalProps> = ({ slide, asp
     // Initial search when modal opens
     useEffect(() => {
         handleSearch();
-    }, [handleSearch]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-    const handleSelectAndConvert = async () => {
+    const handleSelectImage = () => {
         if (selectedImageUrl) {
-            setIsLoading(true); // Re-use loading state for conversion
-            try {
-                const base64 = await imageUrlToBase64(selectedImageUrl);
-                onImageSelect(slide.id, base64);
-                onClose();
-            } catch (err) {
-                setError(err instanceof Error ? err.message : "Failed to convert image.");
-            } finally {
-                setIsLoading(false);
-            }
+            onImageSelect(slide.id, selectedImageUrl);
+            onClose();
         }
     };
 
@@ -84,7 +77,7 @@ export const PexelsSearchModal: React.FC<PexelsSearchModalProps> = ({ slide, asp
                         </button>
                     </div>
                     {error && <div className="bg-red-900/30 border border-red-700/50 text-red-300 text-xs rounded-lg p-2 flex items-start gap-2"><Icon name="alert" className="text-base flex-shrink-0 mt-0.5" /><span>{error}</span></div>}
-                    <div className="grid grid-cols-3 gap-3 overflow-y-auto flex-grow">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 overflow-y-auto flex-grow">
                         {isLoading && results.length === 0 ? (
                             <div className="col-span-3 flex justify-center items-center h-full"><Icon name="loader" className="text-4xl animate-spin text-gray-500" /></div>
                         ) : (
@@ -109,7 +102,7 @@ export const PexelsSearchModal: React.FC<PexelsSearchModalProps> = ({ slide, asp
                     <button onClick={onClose} className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm font-semibold hover:bg-gray-600 transition-colors">
                         Cancel
                     </button>
-                    <button onClick={handleSelectAndConvert} disabled={!selectedImageUrl || isLoading} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed">
+                    <button onClick={handleSelectImage} disabled={!selectedImageUrl || isLoading} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed">
                         Select Image
                     </button>
                 </div>

@@ -57,7 +57,7 @@ export default function App() {
     const [activePresetId, setActivePresetId] = useState<string | null>(null);
     const [toast, setToast] = useState({ message: '', visible: false });
     const [pexelsApiKey, setPexelsApiKey] = useState<string>(
-        () => localStorage.getItem('pexelsApiKey') || process.env.PEXELS_API_KEY || ''
+        () => localStorage.getItem('pexelsApiKey') || import.meta.env.VITE_PEXELS_API_KEY || ''
     );
     const [pexelsSearchModalSlide, setPexelsSearchModalSlide] = useState<Slide | null>(null);
     const [isPexelsKeyVisible, setIsPexelsKeyVisible] = useState(false);
@@ -300,27 +300,31 @@ export default function App() {
         setActivePresetId(preset.id);
     }, [presets]);
 
-    useLayoutEffect(() => {
-        const fontsToLoad = new Set<string>();
-        slides.forEach(slide => {
-            fontsToLoad.add(slide.titleStyle.fontFamily.split(',')[0].replace(/ /g, '+'));
-            fontsToLoad.add(slide.bodyStyle.fontFamily.split(',')[0].replace(/ /g, '+'));
-            if (slide.cta.enabled) {
-                fontsToLoad.add(slide.cta.style.fontFamily.split(',')[0].replace(/ /g, '+'));
-            }
-        });
-        const fontFamilies = [...fontsToLoad].filter(Boolean).join('|');
-        if (!fontFamilies) return;
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            const fontsToLoad = new Set<string>();
+            slides.forEach(slide => {
+                fontsToLoad.add(slide.titleStyle.fontFamily.split(',')[0].replace(/ /g, '+'));
+                fontsToLoad.add(slide.bodyStyle.fontFamily.split(',')[0].replace(/ /g, '+'));
+                if (slide.cta.enabled) {
+                    fontsToLoad.add(slide.cta.style.fontFamily.split(',')[0].replace(/ /g, '+'));
+                }
+            });
+            const fontFamilies = [...fontsToLoad].filter(Boolean).join('|');
+            if (!fontFamilies) return;
 
-        const linkId = 'google-fonts-stylesheet';
-        let link = document.getElementById(linkId) as HTMLLinkElement;
-        if (!link) {
-            link = document.createElement('link');
-            link.id = linkId;
-            link.rel = 'stylesheet';
-            document.head.appendChild(link);
-        }
-        link.href = `https://fonts.googleapis.com/css2?family=${fontFamilies}:wght@400;700&display=swap`;
+            const linkId = 'google-fonts-stylesheet';
+            let link = document.getElementById(linkId) as HTMLLinkElement;
+            if (!link) {
+                link = document.createElement('link');
+                link.id = linkId;
+                link.rel = 'stylesheet';
+                document.head.appendChild(link);
+            }
+            link.href = `https://fonts.googleapis.com/css2?family=${fontFamilies}:wght@400;700&display=swap`;
+        }, 800);
+
+        return () => clearTimeout(timeoutId);
     }, [slides]);
 
     const handleGenerateCarousel = useCallback(async () => {
@@ -413,7 +417,7 @@ export default function App() {
 
         try {
             const imageData = await generateImage(originalSlide.prompt, aspectRatio);
-            setSlides(currentSlides => currentSlides.map(s => s.id === slideId ? { ...s, src: `data:image/png;base64,${imageData}`, isLoading: false } : s));
+            setSlides(currentSlides => currentSlides.map(s => s.id === slideId ? { ...s, src: imageData, isLoading: false } : s));
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
             setSlides(currentSlides => currentSlides.map(s => s.id === slideId ? { ...s, isLoading: false, error: errorMessage } : s));
@@ -428,8 +432,8 @@ export default function App() {
         setPexelsSearchModalSlide(slide);
     }, [pexelsApiKey]);
 
-    const handlePexelsImageSelect = useCallback((slideId: string, base64Image: string) => {
-        setSlides(currentSlides => currentSlides.map(s => s.id === slideId ? { ...s, src: `data:image/png;base64,${base64Image}`, isLoading: false, error: undefined } : s));
+    const handlePexelsImageSelect = useCallback((slideId: string, imageUrl: string) => {
+        setSlides(currentSlides => currentSlides.map(s => s.id === slideId ? { ...s, src: imageUrl, isLoading: false, error: undefined } : s));
         setPexelsSearchModalSlide(null); // Close modal
     }, []);
 

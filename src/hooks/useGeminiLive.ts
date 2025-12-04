@@ -117,7 +117,7 @@ export const useGeminiLive = ({ onTranscriptionUpdate, onToolCall, onStatusChang
     const startSession = useCallback(async () => {
         try {
             onStatusChange('processing', 'Connecting...');
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+            const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
 
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             mediaStreamRef.current = stream;
