@@ -1,6 +1,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
+const getAiClient = () => {
+    const apiKey = import.meta.env.VITE_API_KEY;
+    if (!apiKey) {
+        throw new Error("VITE_API_KEY is missing. Please set it in your .env file.");
+    }
+    return new GoogleGenAI({ apiKey });
+};
 
 const base64ToBlobURL = (base64: string, contentType: string = 'image/png'): string => {
     const byteCharacters = atob(base64);
@@ -87,7 +93,7 @@ export const generateImage = async (prompt: string, aspectRatio: '1:1' | '4:5'):
         // Map the app's '4:5' aspect ratio to imagen's supported '3:4'
         const imagenAspectRatio = aspectRatio === '4:5' ? '3:4' : '1:1';
 
-        const response = await ai.models.generateImages({
+        const response = await getAiClient().models.generateImages({
             model,
             prompt,
             config: {
@@ -156,7 +162,7 @@ For each slide, you must also generate a detailed 'prompt' for an image generati
 
         const combinedUserPrompt = imagePrompt ? `IMAGE STYLE PROMPT:\n${imagePrompt}\n\nSLIDE CONTENT PROMPT:\n${contentPrompt}` : `SLIDE CONTENT PROMPT:\n${contentPrompt}`;
 
-        const response = await ai.models.generateContent({
+        const response = await getAiClient().models.generateContent({
             model: promptGeneratorModel,
             contents: combinedUserPrompt,
             config: {
